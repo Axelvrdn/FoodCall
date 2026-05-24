@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Limelight&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #EA580B;
+  --secondary: #F59E0B;
+  --success: #16A34A;
+  --danger: #DC2626;
+  --bg: #FFEDD5;
+  --surface: #FFFFFF;
+  --surface-warm: #FFF8F0;
+  --fg: #1D1820;
+  --muted: #6D6572;
+  --border: #F0D4B8;
+  --soft: #F4E4D2;
+  --radius: 24px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; }
+
+/* Focus indicators */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Touch-safe hover states */
+@media (hover: hover) and (pointer: fine) {
+  .hover-safe:hover {
+    opacity: 0.85;
+  }
+}

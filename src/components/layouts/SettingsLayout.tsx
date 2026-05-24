@@ -1,0 +1,4 @@
+import type { PropsWithChildren } from 'react';
+
+const sections = ['Informations du compte', 'Confidentialité', 'Sécurité', "Préférences d'affichage"];
+export function SettingsLayout({ children }: PropsWithChildren) { return <div className="grid gap-6 lg:grid-cols-[280px_1fr]"><aside className="h-fit rounded-card bg-surface p-4 shadow-soft lg:sticky lg:top-28">{sections.map((section) => <a key={section} href={`#${section.toLowerCase().replaceAll(' ', '-')}`} className="block rounded-full px-4 py-3 text-sm font-semibold text-muted transition-transform duration-150 ease-out hover:bg-soft active:scale-[0.97]">{section}</a>)}</aside><div>{children}</div></div>; }

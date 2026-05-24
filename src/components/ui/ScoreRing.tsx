@@ -1,0 +1,2 @@
+export interface ScoreRingProps { value: number; label?: string; }
+export function ScoreRing({ value, label = 'score' }: ScoreRingProps) { const safeValue = Math.min(100, Math.max(0, value)); return <div aria-label={label} className="grid h-28 w-28 place-items-center rounded-full" style={{ background: `conic-gradient(#EA580B ${safeValue}%, #F4E4D2 0)` }}><div className="grid h-20 w-20 place-items-center rounded-full bg-surface font-mono text-2xl font-bold text-fg">{safeValue}</div></div>; }

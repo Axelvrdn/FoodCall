@@ -1,0 +1,52 @@
+/* Mobile-first responsive utilities */
+
+/* Tablet (>= 680px) */
+@media (min-width: 680px) {
+  .card-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nav-expanded {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+}
+
+/* Desktop (>= 1180px) */
+@media (min-width: 1180px) {
+  .card-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .page-sidebar {
+    grid-template-columns: 280px 1fr;
+  }
+
+  .content-max {
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .search-row {
+    grid-template-columns: 1fr 180px auto;
+  }
+}
+
+/* Large desktop (>= 1440px) */
+@media (min-width: 1440px) {
+  .content-wide {
+    max-width: 1600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Touch target minimum for mobile */
+@media (max-width: 679px) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

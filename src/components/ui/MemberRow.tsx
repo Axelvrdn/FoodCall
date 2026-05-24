@@ -1,0 +1,2 @@
+export interface MemberRowProps { name: string; info: string; score: number; }
+export function MemberRow({ name, info, score }: MemberRowProps) { return <div className="flex items-center justify-between rounded-card bg-surface p-4 shadow-soft"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-full bg-primary text-white font-bold">{name[0]}</div><div><p className="font-bold">{name}</p><p className="text-sm text-muted">{info}</p></div></div><span className="font-mono text-primary">{score}</span></div>; }

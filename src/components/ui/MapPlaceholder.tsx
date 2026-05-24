@@ -1,0 +1,2 @@
+export interface MapPlaceholderProps { label?: string; }
+export function MapPlaceholder({ label = 'Carte interactive à brancher plus tard' }: MapPlaceholderProps) { return <div className="grid min-h-72 place-items-center rounded-card border border-dashed border-primary/40 bg-surface-warm p-8 text-center text-muted"><div><p className="font-display text-3xl text-primary">MapPlaceholder</p><p className="mt-2">{label}</p></div></div>; }

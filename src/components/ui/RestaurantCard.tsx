@@ -1,0 +1,5 @@
+import { formatDistance } from '@/lib';
+import type { Restaurant } from '@/types/api';
+import { Tag } from './Tag';
+export interface RestaurantCardProps { restaurant: Restaurant; actionLabel?: string; }
+export function RestaurantCard({ restaurant, actionLabel = 'Voir' }: RestaurantCardProps) { return <article className="rounded-card bg-surface p-5 shadow-soft"><div className="mb-4 h-32 rounded-[20px] bg-soft" /><h3 className="text-xl font-bold">{restaurant.name}</h3><p className="mt-1 text-sm text-muted">{restaurant.description}</p><div className="mt-3 flex flex-wrap gap-2">{restaurant.cuisineTags.map((tag) => <Tag key={tag} tone="neutral">{tag}</Tag>)}</div><div className="mt-4 flex items-center justify-between"><span className="font-mono text-sm text-primary">{restaurant.distanceMeters ? formatDistance(restaurant.distanceMeters) : restaurant.address}</span><button className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97]">{actionLabel}</button></div></article>; }

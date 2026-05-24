@@ -1,0 +1,3 @@
+import { ProgressBar } from './ProgressBar';
+export interface VoteCardProps { rank: number; name: string; votes: number; percentage: number; }
+export function VoteCard({ rank, name, votes, percentage }: VoteCardProps) { return <article className="rounded-card bg-surface p-5 shadow-soft"><div className="flex items-center justify-between"><div><span className="font-mono text-primary">#{rank}</span><h3 className="text-lg font-bold">{name}</h3></div><span className="font-mono text-muted">{votes} votes</span></div><div className="mt-4"><ProgressBar value={percentage} label={`${name} ${percentage}%`} /></div></article>; }
