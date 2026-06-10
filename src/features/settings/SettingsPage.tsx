@@ -1,6 +1,5 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SettingsLayout } from '@/components/layouts';
 import { Hero } from '@/components/ui';
 import { ROUTES, validatePassword } from '@/lib';
 import { authService } from '@/services';
@@ -9,11 +8,33 @@ import { queryClient } from '@/app/query-client';
 import type { NormalizedApiError } from '@/services/api-client';
 
 const SETTINGS_SECTIONS = [
-  'Informations du compte',
+  'Compte',
+  'Profil',
+  'Préférences alimentaires',
+  'Notifications',
   'Confidentialité',
   'Sécurité',
-  "Préférences d'affichage",
+  'Apparence / affichage',
 ] as const;
+
+const SETTINGS_COPY: Record<typeof SETTINGS_SECTIONS[number], string> = {
+  Compte: 'Identité de connexion et accès au compte. Les changements persistants se font depuis le profil quand l’API les prend en charge.',
+  Profil: 'Nom affiché, e-mail et avatar sont gérés dans la page Profil avec les endpoints /users/me documentés.',
+  'Préférences alimentaires': 'Aucun endpoint ne persiste encore les préférences alimentaires. Cette section reste informative jusqu’au contrat backend dédié.',
+  Notifications: 'Aucun endpoint de notifications n’est disponible. Les préférences ne sont donc pas éditables ici.',
+  Confidentialité: 'Aucun endpoint ne modifie encore la confidentialité. Les options seront activées quand le backend exposera ces réglages.',
+  Sécurité: 'Change ton mot de passe avec le endpoint backend dédié. Une réussite déconnecte la session locale.',
+  'Apparence / affichage': 'Les préférences d’affichage restent locales à définir et ne sont pas persistées par l’API actuelle.',
+};
+
+function sectionId(section: typeof SETTINGS_SECTIONS[number]) {
+  return section
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 export function SettingsPage() {
   return (
@@ -22,49 +43,35 @@ export function SettingsPage() {
         title="Paramètres"
         subtitle="Compte, sécurité, confidentialité et affichage."
       />
-      <SettingsLayout>
-        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <article
-            id="informations-du-compte"
-            className="rounded-card bg-surface p-5 shadow-soft"
-          >
-            <h2 className="text-xl font-bold text-fg">Informations du compte</h2>
-            <p className="mt-2 text-sm text-muted">
-              Mise à jour du profil et de l'email à venir.
-            </p>
-          </article>
+      <div className="grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <nav aria-label="Sections des paramètres" className="rounded-card bg-surface p-4 shadow-soft lg:sticky lg:top-28 lg:self-start">
+          <div className="grid gap-2">
+            {SETTINGS_SECTIONS.map((section) => (
+              <a
+                key={section}
+                href={`#${sectionId(section)}`}
+                className="rounded-2xl px-3 py-2 text-sm font-semibold text-muted transition-colors duration-150 hover:bg-surface-warm hover:text-fg"
+              >
+                {section}
+              </a>
+            ))}
+          </div>
+        </nav>
 
-          <article
-            id="confidentialite"
-            className="rounded-card bg-surface p-5 shadow-soft"
-          >
-            <h2 className="text-xl font-bold text-fg">Confidentialité</h2>
-            <p className="mt-2 text-sm text-muted">
-              Paramètres de confidentialité à venir.
-            </p>
-          </article>
-
-          <article
-            id="securite"
-            className="rounded-card bg-surface p-5 shadow-soft md:col-span-2 lg:col-span-1"
-          >
-            <h2 className="text-xl font-bold text-fg">Sécurité</h2>
-            <ChangePasswordForm />
-          </article>
-
-          <article
-            id="preferences-daffichage"
-            className="rounded-card bg-surface p-5 shadow-soft"
-          >
-            <h2 className="text-xl font-bold text-fg">
-              Préférences d&apos;affichage
-            </h2>
-            <p className="mt-2 text-sm text-muted">
-              Options d&apos;affichage à venir.
-            </p>
-          </article>
+        <section className="grid gap-6">
+          {SETTINGS_SECTIONS.map((section) => (
+            <article
+              key={section}
+              id={sectionId(section)}
+              className="scroll-mt-36 rounded-card bg-surface p-6 shadow-soft lg:scroll-mt-32"
+            >
+              <h2 className="text-xl font-bold text-fg">{section}</h2>
+              <p className="mt-2 text-sm text-muted">{SETTINGS_COPY[section]}</p>
+              {section === 'Sécurité' && <ChangePasswordForm />}
+            </article>
+          ))}
         </section>
-      </SettingsLayout>
+      </div>
     </div>
   );
 }

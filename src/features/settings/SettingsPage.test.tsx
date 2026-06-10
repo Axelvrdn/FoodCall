@@ -44,22 +44,50 @@ describe('SettingsPage', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the four scoped sections: Compte, Confidentialité, Sécurité, Affichage', () => {
+  it('renders the seven vertical settings sections with a navigation rail', () => {
     renderSettings();
 
-    expect(screen.getAllByText('Informations du compte').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Confidentialité').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Sécurité').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Préférences d'affichage").length).toBeGreaterThanOrEqual(1);
+    for (const section of [
+      'Compte',
+      'Profil',
+      'Préférences alimentaires',
+      'Notifications',
+      'Confidentialité',
+      'Sécurité',
+      'Apparence / affichage',
+    ]) {
+      expect(screen.getAllByRole('link', { name: section })).toHaveLength(1);
+      expect(screen.getByRole('heading', { name: section })).toBeInTheDocument();
+    }
   });
 
-  it('does not render notification, food preference, favorite, or group departure address controls', () => {
+  it('keeps anchored sections below the sticky header when reached from internal navigation', () => {
+    const { container } = renderSettings();
+
+    for (const sectionId of [
+      'compte',
+      'profil',
+      'preferences-alimentaires',
+      'notifications',
+      'confidentialite',
+      'securite',
+      'apparence-affichage',
+    ]) {
+      const target = container.querySelector(`#${sectionId}`);
+
+      expect(target).toBeInTheDocument();
+      expect(target).toHaveClass('scroll-mt-36');
+    }
+  });
+
+  it('marks unsupported settings areas as explanatory placeholders instead of editable controls', () => {
     renderSettings();
 
-    expect(screen.queryByText(/préférences alimentaires/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/notifications/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/favoris/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/adresse de départ/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/aucun endpoint ne persiste encore les préférences alimentaires/i)).toBeInTheDocument();
+    expect(screen.getByText(/aucun endpoint de notifications n.est disponible/i)).toBeInTheDocument();
+    expect(screen.getByText(/aucun endpoint ne modifie encore la confidentialité/i)).toBeInTheDocument();
+    expect(screen.getByText(/les préférences d.affichage restent locales à définir/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/adresse de départ/i)).not.toBeInTheDocument();
   });
 
   describe('Change Password form', () => {
