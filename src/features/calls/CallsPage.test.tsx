@@ -31,13 +31,16 @@ describe('CallsPage', () => {
     expect(screen.getByText(/backend fournira/i)).toBeInTheDocument();
   });
 
-  it('renders the score ring with value 84', () => {
+  it('does not render a fake score value', () => {
     render(<CallsPage />, { wrapper: createWrapper() });
-    expect(screen.getByText('84')).toBeInTheDocument();
+    expect(screen.queryByText('84')).not.toBeInTheDocument();
+    expect(screen.getByText(/score non calculé/i)).toBeInTheDocument();
   });
 
-  it('renders the badge card for "Call fiable"', () => {
+  it('renders honest calls guidance and useful CTAs', () => {
     render(<CallsPage />, { wrapper: createWrapper() });
-    expect(screen.getByText('Call fiable')).toBeInTheDocument();
+    expect(screen.getByText(/aucun endpoint utilisateur ne liste encore tes calls/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /voir mes groupes/i })).toHaveAttribute('href', '/groupes');
+    expect(screen.getByRole('link', { name: /découvrir des restaurants/i })).toHaveAttribute('href', '/decouvrir');
   });
 });

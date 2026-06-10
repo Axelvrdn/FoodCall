@@ -122,6 +122,25 @@ describe('LoginPage', () => {
     });
   });
 
+  it('clears issued tokens when /users/me fails after login succeeds', async () => {
+    const user = userEvent.setup();
+    mockLogin.mockResolvedValueOnce({ accessToken: 'at', refreshToken: 'rt' });
+    mockMe.mockRejectedValueOnce(new Error('Current user unavailable'));
+
+    renderLogin();
+
+    await user.type(screen.getByLabelText('Email'), 'thomas@foodcall.test');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Password123!');
+    await user.click(screen.getByRole('button', { name: /se connecter/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Connexion impossible avec ces identifiants.');
+      expect(useAuthStore.getState().accessToken).toBeNull();
+      expect(useAuthStore.getState().refreshToken).toBeNull();
+      expect(useAuthStore.getState().user).toBeNull();
+    });
+  });
+
   it('disables submit button during pending state and re-enables after error', async () => {
     const user = userEvent.setup();
     mockLogin.mockRejectedValueOnce({ status: 401, message: 'Unauthorized', code: 'Unauthorized' });
@@ -198,6 +217,26 @@ describe('RegisterPage', () => {
     await waitFor(() => {
       expect(useAuthStore.getState().accessToken).toBe('at');
       expect(useAuthStore.getState().user).toEqual(defaultUser);
+    });
+  });
+
+  it('clears issued tokens when /users/me fails after registration succeeds', async () => {
+    const user = userEvent.setup();
+    mockRegister.mockResolvedValueOnce({ accessToken: 'at', refreshToken: 'rt' });
+    mockMe.mockRejectedValueOnce(new Error('Current user unavailable'));
+
+    renderRegister();
+
+    await user.type(screen.getByLabelText('Nom affiché'), 'Thomas');
+    await user.type(screen.getByLabelText('Email'), 'thomas@foodcall.test');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Str0ng!Pass12');
+    await user.click(screen.getByRole('button', { name: /créer mon compte/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Erreur lors de l’inscription. Réessaie plus tard.');
+      expect(useAuthStore.getState().accessToken).toBeNull();
+      expect(useAuthStore.getState().refreshToken).toBeNull();
+      expect(useAuthStore.getState().user).toBeNull();
     });
   });
 });
@@ -280,6 +319,20 @@ describe('OnboardingPage', () => {
     expect(screen.getByText('Ville')).toBeInTheDocument();
     expect(screen.getByText('Préférences alimentaires')).toBeInTheDocument();
     expect(screen.getByText(/créer ou rejoindre un groupe/i)).toBeInTheDocument();
+  });
+
+  it('offers clear non-blocking onboarding exits', () => {
+    render(
+      <MemoryRouter initialEntries={[ROUTES.onboarding]}>
+        <Routes>
+          <Route path={ROUTES.onboarding} element={<OnboardingPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: /continuer vers découvrir/i })).toHaveAttribute('href', ROUTES.discover);
+    expect(screen.getByRole('link', { name: /rejoindre mes groupes/i })).toHaveAttribute('href', ROUTES.groups);
+    expect(screen.getByText(/tu pourras compléter ces préférences plus tard/i)).toBeInTheDocument();
   });
 });
 

@@ -10,6 +10,7 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const setTokens = useAuthStore((state) => state.setTokens);
   const setUser = useAuthStore((state) => state.setUser);
+  const logout = useAuthStore((state) => state.logout);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -36,7 +37,13 @@ export function RegisterPage() {
         password,
       });
       setTokens(response.accessToken, response.refreshToken);
-      const userResponse = await authService.me();
+      let userResponse;
+      try {
+        userResponse = await authService.me();
+      } catch (err) {
+        logout();
+        throw err;
+      }
       setUser(userResponse);
       navigate(ROUTES.onboarding);
     } catch (err) {

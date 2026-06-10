@@ -10,6 +10,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const setTokens = useAuthStore((state) => state.setTokens);
   const setUser = useAuthStore((state) => state.setUser);
+  const logout = useAuthStore((state) => state.logout);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
@@ -24,7 +25,13 @@ export function LoginPage() {
         password: String(data.get('password')),
       });
       setTokens(response.accessToken, response.refreshToken);
-      const userResponse = await authService.me();
+      let userResponse;
+      try {
+        userResponse = await authService.me();
+      } catch (err) {
+        logout();
+        throw err;
+      }
       setUser(userResponse);
       navigate(ROUTES.discover);
     } catch (err) {
