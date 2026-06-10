@@ -4,11 +4,27 @@ import { NAV_ITEMS, ROUTES, USER_MENU_ITEMS } from '@/lib';
 import { useAuthStore } from '@/stores/auth-store';
 import { authService } from '@/services';
 
+function getUserLabel(user: ReturnType<typeof useAuthStore.getState>['user']) {
+  const displayName = user?.displayName?.trim();
+  if (displayName) return displayName;
+
+  const email = user?.email?.trim();
+  if (email) return email.split('@')[0] || email;
+
+  return 'Compte';
+}
+
+function getUserInitial(label: string) {
+  return label.trim().charAt(0).toUpperCase() || 'C';
+}
+
 export function TopBar() {
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const userLabel = getUserLabel(user);
+  const userInitial = getUserInitial(userLabel);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -60,9 +76,9 @@ export function TopBar() {
           <details ref={detailsRef} className="relative">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full bg-surface-warm py-1 pl-1 pr-3 transition-transform duration-150 ease-out active:scale-[0.97]">
               <span className="grid h-9 w-9 place-items-center rounded-full bg-primary font-bold text-white">
-                {user?.displayName?.[0] ?? 'T'}
+                {userInitial}
               </span>
-              <span className="text-sm font-bold">{user?.displayName ?? 'Thomas'}</span>
+              <span className="text-sm font-bold">{userLabel}</span>
             </summary>
             <div className="absolute right-0 mt-2 w-48 rounded-card border border-border bg-surface p-2 shadow-card">
               {USER_MENU_ITEMS.map((item) => (

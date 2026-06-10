@@ -39,6 +39,42 @@ button, input, select, textarea { font: inherit; }
   outline-offset: 2px;
 }
 
+/* Shared FoodCall hero atmosphere — ReactBits Grainient WebGL with static fallback */
+.foodcall-animated-background {
+  isolation: isolate;
+}
+
+.foodcall-animated-background__fallback,
+.grainient-container {
+  inset: 0;
+  overflow: hidden;
+  position: absolute;
+}
+
+.foodcall-animated-background__fallback {
+  background:
+    radial-gradient(circle at 18% 16%, rgba(234, 179, 8, 0.84), transparent 30%),
+    radial-gradient(circle at 76% 24%, rgba(249, 115, 22, 0.8), transparent 34%),
+    radial-gradient(circle at 62% 82%, rgba(239, 68, 68, 0.68), transparent 40%),
+    linear-gradient(135deg, #EAB308 0%, #F97316 48%, #EF4444 100%);
+}
+
+.foodcall-animated-background__fallback::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.16) 0 0.75px, transparent 1px),
+    radial-gradient(circle at 78% 68%, rgba(85, 45, 16, 0.14) 0 0.8px, transparent 1.1px);
+  background-size: 28px 28px, 42px 42px;
+  mix-blend-mode: soft-light;
+}
+
+.foodcall-animated-background__grainient canvas {
+  position: relative;
+  z-index: 1;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -48,6 +84,14 @@ button, input, select, textarea { font: inherit; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .foodcall-animated-background,
+  .foodcall-animated-background__fallback,
+  .foodcall-animated-background__fallback::after,
+  .grainient-container {
+    animation: none !important;
+    transform: none !important;
   }
 }
 

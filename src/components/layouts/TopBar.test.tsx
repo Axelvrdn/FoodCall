@@ -87,9 +87,29 @@ describe('TopBar', () => {
     expect(screen.getByText('A')).toBeInTheDocument();
   });
 
-  it('shows default initial when no user', () => {
+  it('uses a neutral fallback when no user is loaded', () => {
     renderTopBar();
-    expect(screen.getByText('T')).toBeInTheDocument();
+    expect(screen.getByText('C')).toBeInTheDocument();
+    expect(screen.getByText('Compte')).toBeInTheDocument();
+    expect(screen.queryByText('Thomas')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the email local part when displayName is missing', () => {
+    useAuthStore.getState().setTokens('access-token', 'refresh-token');
+    useAuthStore.getState().setUser({
+      id: '1',
+      email: 'camille@foodcall.test',
+      displayName: '',
+      avatarUrl: null,
+      reputationScore: 0,
+      createdAt: '',
+      updatedAt: '',
+    });
+
+    renderTopBar();
+
+    expect(screen.getByText('camille')).toBeInTheDocument();
+    expect(screen.getByText('C')).toBeInTheDocument();
   });
 
   it('renders exactly 4 nav items: Découvrir, Groupes, Avis, Mes calls', () => {
