@@ -57,19 +57,38 @@ export const groupInvitesService = {
     apiClient.post<GroupMember>(buildApiRoute(API_ROUTES.groupJoin), { code }).then((r) => r.data),
 };
 
+function normalizeRestaurant(restaurant: Restaurant): Restaurant {
+  return {
+    ...restaurant,
+    description: restaurant.description ?? null,
+    cuisineTags: Array.isArray(restaurant.cuisineTags) ? restaurant.cuisineTags : [],
+    photoUrls: Array.isArray(restaurant.photoUrls) ? restaurant.photoUrls : [],
+    phone: restaurant.phone ?? null,
+    website: restaurant.website ?? null,
+    createdBy: restaurant.createdBy ?? '',
+  };
+}
+
+function normalizeRestaurantPage(page: CursorPage<Restaurant>): CursorPage<Restaurant> {
+  return {
+    ...page,
+    data: page.data.map(normalizeRestaurant),
+  };
+}
+
 export const restaurantsService = {
   list: (cursor?: string, limit?: number) =>
-    apiClient.get<CursorPage<Restaurant>>(API_ROUTES.restaurants, { params: { cursor, limit } }).then((r) => r.data),
+    apiClient.get<CursorPage<Restaurant>>(API_ROUTES.restaurants, { params: { cursor, limit } }).then((r) => normalizeRestaurantPage(r.data)),
   nearby: (lat: number, lng: number, radius?: number, limit?: number, cursor?: string) =>
-    apiClient.get<CursorPage<Restaurant>>(API_ROUTES.restaurantsNearby, { params: { lat, lng, radius, limit, cursor } }).then((r) => r.data),
+    apiClient.get<CursorPage<Restaurant>>(API_ROUTES.restaurantsNearby, { params: { lat, lng, radius, limit, cursor } }).then((r) => normalizeRestaurantPage(r.data)),
   search: (q?: string, cursor?: string, limit?: number) =>
-    apiClient.get<CursorPage<Restaurant>>(API_ROUTES.restaurantsSearch, { params: { q, cursor, limit } }).then((r) => r.data),
+    apiClient.get<CursorPage<Restaurant>>(API_ROUTES.restaurantsSearch, { params: { q, cursor, limit } }).then((r) => normalizeRestaurantPage(r.data)),
   get: (id: string) =>
-    apiClient.get<Restaurant>(buildApiRoute(API_ROUTES.restaurantDetail, { id })).then((r) => r.data),
+    apiClient.get<Restaurant>(buildApiRoute(API_ROUTES.restaurantDetail, { id })).then((r) => normalizeRestaurant(r.data)),
   create: (payload: RestaurantCreateRequest) =>
-    apiClient.post<Restaurant>(API_ROUTES.restaurants, payload).then((r) => r.data),
+    apiClient.post<Restaurant>(API_ROUTES.restaurants, payload).then((r) => normalizeRestaurant(r.data)),
   update: (id: string, payload: RestaurantUpdateRequest) =>
-    apiClient.patch<Restaurant>(buildApiRoute(API_ROUTES.restaurantDetail, { id }), payload).then((r) => r.data),
+    apiClient.patch<Restaurant>(buildApiRoute(API_ROUTES.restaurantDetail, { id }), payload).then((r) => normalizeRestaurant(r.data)),
   delete: (id: string) =>
     apiClient.delete<void>(buildApiRoute(API_ROUTES.restaurantDetail, { id })).then(() => undefined),
 };

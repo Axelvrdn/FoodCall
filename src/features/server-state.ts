@@ -242,7 +242,7 @@ export function useRestaurantsNearbyQuery(
 
 export function useRestaurantsSearchQuery(q?: string, cursor?: string, limit?: number, options?: QOptions<CursorPage<Restaurant>>) {
   return useQuery({
-    queryKey: queryKeys.restaurants.search(q, cursor),
+    queryKey: queryKeys.restaurants.search(q, cursor, limit),
     queryFn: () => restaurantsService.search(q, cursor, limit),
     ...options,
   });

@@ -21,7 +21,7 @@ export const queryKeys = {
     list: (cursor?: string) => ['restaurants', 'list', cursor ?? null] as const,
     nearby: (params: { lat: number; lng: number; radius?: number; limit?: number; cursor?: string }) =>
       ['restaurants', 'nearby', params] as const,
-    search: (q?: string, cursor?: string) => ['restaurants', 'search', q ?? null, cursor ?? null] as const,
+    search: (q?: string, cursor?: string, limit?: number) => ['restaurants', 'search', q ?? null, cursor ?? null, limit ?? null] as const,
     detail: (id: string) => ['restaurants', 'detail', id] as const,
     reviews: (restaurantId: string, cursor?: string) => ['restaurants', 'detail', restaurantId, 'reviews', cursor ?? null] as const,
   },

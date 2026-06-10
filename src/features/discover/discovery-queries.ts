@@ -62,7 +62,10 @@ export function useDiscoverySearch(
   cursor?: string,
   limit?: number,
 ) {
-  return useRestaurantsSearchQuery(q, cursor, limit, {
+  const trimmed = q?.trim() ?? '';
+
+  return useRestaurantsSearchQuery(trimmed, cursor, limit, {
+    enabled: trimmed.length >= GEOCODE_MIN_LENGTH,
     staleTime: DISCOVERY_STALE_MS,
   });
 }

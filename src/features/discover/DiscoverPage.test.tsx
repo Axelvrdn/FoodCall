@@ -115,6 +115,8 @@ describe('DiscoverPage', () => {
 
       server.use(
         http.get(`${BASE}/geo/geocode`, () => HttpResponse.json([geocodeFixture])),
+        http.get(`${BASE}/restaurants/search`, () =>
+          HttpResponse.json({ data: [], meta: { nextCursor: null } })),
         http.get(`${BASE}/restaurants/nearby`, () =>
           HttpResponse.json(paginate(restaurantFixtures.slice(0, 3)))),
       );
@@ -124,12 +126,131 @@ describe('DiscoverPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /trouver/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Le Petit Bistrot Lillois')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Le Petit Bistrot Lillois' })).toBeInTheDocument();
       });
+    });
+
+    it('sends the typed restaurant search query and changes results by query', async () => {
+      const user = userEvent.setup();
+      const seenQueries: string[] = [];
+
+      server.use(
+        http.get(`${BASE}/restaurants/search`, ({ request }) => {
+          const url = new URL(request.url);
+          const q = url.searchParams.get('q') ?? '';
+          seenQueries.push(q);
+
+          const restaurants = restaurantFixtures.filter((restaurant) =>
+            restaurant.name.toLowerCase().includes(q.toLowerCase()) ||
+            restaurant.cuisineTags.some((tag) => tag.toLowerCase().includes(q.toLowerCase())) ||
+            restaurant.address.toLowerCase().includes(q.toLowerCase()),
+          );
+
+          return HttpResponse.json(paginate(restaurants));
+        }),
+      );
+
+      render(<DiscoverPage />, { wrapper: createWrapper() });
+
+      const input = screen.getByPlaceholderText(/adresse/i);
+      await user.type(input, 'kebab');
+      await user.click(screen.getByRole('button', { name: /trouver/i }));
+
+      await waitFor(() => {
+        expect(seenQueries).toContain('kebab');
+        expect(screen.getByRole('heading', { name: 'Lille Kebab Express' })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('heading', { name: 'Le Petit Bistrot Lillois' })).not.toBeInTheDocument();
+
+      await user.clear(input);
+      await user.type(input, 'bistrot');
+      await user.click(screen.getByRole('button', { name: /trouver/i }));
+
+      await waitFor(() => {
+        expect(seenQueries).toContain('bistrot');
+        expect(screen.getByRole('heading', { name: 'Le Petit Bistrot Lillois' })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('heading', { name: 'Lille Kebab Express' })).not.toBeInTheDocument();
+    });
+
+    it('recalculates searched restaurant distance from the active geocoded origin instead of trusting stale fixture distances', async () => {
+      const user = userEvent.setup();
+
+      server.use(
+        http.get(`${BASE}/geo/geocode`, () => HttpResponse.json([{ lat: 48.8566, lng: 2.3522, formattedAddress: 'Paris' }])),
+        http.get(`${BASE}/restaurants/search`, () => HttpResponse.json(paginate([restaurantFixtures[1]]))),
+        http.get(`${BASE}/restaurants/nearby`, () => HttpResponse.json({ data: [], meta: { nextCursor: null } })),
+      );
+
+      render(<DiscoverPage />, { wrapper: createWrapper() });
+
+      const input = screen.getByPlaceholderText(/adresse/i);
+      await user.type(input, 'bistrot');
+      await user.click(screen.getByRole('button', { name: /trouver/i }));
+
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Le Petit Bistrot Lillois' })).toBeInTheDocument());
+
+      expect(screen.getByText('203,3 km')).toBeInTheDocument();
+      expect(screen.queryByText('380 m')).not.toBeInTheDocument();
     });
   });
 
   describe('nearby success', () => {
+    it('renders nearby backend projections that omit optional restaurant arrays', async () => {
+      const mockGeo = mockGeolocation({ latitude: 50.6292, longitude: 3.0573 });
+      vi.stubGlobal('navigator', { ...navigator, geolocation: mockGeo });
+
+      server.use(
+        http.get(`${BASE}/restaurants/nearby`, () =>
+          HttpResponse.json({
+            data: [
+              {
+                id: 'rest-live-projection',
+                name: 'Live Backend Projection',
+                address: '1 Rue Runtime, Lille',
+                latitude: '50.629200',
+                longitude: '3.057300',
+                createdAt: '2026-06-01T12:00:00.000Z',
+                distanceMeters: 128,
+              },
+            ],
+            meta: { nextCursor: null },
+          })),
+      );
+
+      render(<DiscoverPage />, { wrapper: createWrapper() });
+      await clickGeolocate();
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Live Backend Projection' })).toBeInTheDocument();
+      });
+      expect(screen.getByText('128 m')).toBeInTheDocument();
+
+      vi.restoreAllMocks();
+    });
+
+    it('renders a restaurant map surface instead of the prototype placeholder', async () => {
+      const mockGeo = mockGeolocation({ latitude: 50.6292, longitude: 3.0573 });
+      vi.stubGlobal('navigator', { ...navigator, geolocation: mockGeo });
+
+      server.use(
+        http.get(`${BASE}/restaurants/nearby`, () =>
+          HttpResponse.json(paginate(restaurantFixtures.slice(0, 2)))),
+      );
+
+      render(<DiscoverPage />, { wrapper: createWrapper() });
+      await clickGeolocate();
+
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Lille Kebab Express' })).toBeInTheDocument());
+      expect(screen.getByRole('region', { name: /carte des restaurants/i })).toBeInTheDocument();
+      expect(screen.getByTestId('restaurant-map-nowebgl')).toBeInTheDocument();
+      expect(screen.queryByText(/carte en préparation/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/2 restaurants issus de l.api/i)).toBeInTheDocument();
+      expect(screen.queryByText('MapPlaceholder')).not.toBeInTheDocument();
+
+      vi.restoreAllMocks();
+    });
+
     it('renders restaurant cards with distance', async () => {
       const mockGeo = mockGeolocation({ latitude: 50.6292, longitude: 3.0573 });
       vi.stubGlobal('navigator', { ...navigator, geolocation: mockGeo });
@@ -143,8 +264,8 @@ describe('DiscoverPage', () => {
       await clickGeolocate();
 
       await waitFor(() => {
-        expect(screen.getByText('Lille Kebab Express')).toBeInTheDocument();
-        expect(screen.getByText('Le Petit Bistrot Lillois')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Lille Kebab Express' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Le Petit Bistrot Lillois' })).toBeInTheDocument();
       });
 
       expect(screen.getByText('250 m')).toBeInTheDocument();
@@ -153,7 +274,7 @@ describe('DiscoverPage', () => {
       vi.restoreAllMocks();
     });
 
-    it('shows address when distance is unavailable', async () => {
+    it('calculates distance from active coordinates when backend distance is unavailable', async () => {
       const mockGeo = mockGeolocation({ latitude: 50.6292, longitude: 3.0573 });
       vi.stubGlobal('navigator', { ...navigator, geolocation: mockGeo });
 
@@ -171,10 +292,39 @@ describe('DiscoverPage', () => {
       await clickGeolocate();
 
       await waitFor(() => {
-        expect(screen.getByText('Lille Kebab Express')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Lille Kebab Express' })).toBeInTheDocument();
       });
 
-      expect(screen.getByText('1 Rue Nationale, Lille')).toBeInTheDocument();
+      expect(screen.getByText('365 m')).toBeInTheDocument();
+      expect(screen.queryByText('Distance inconnue')).not.toBeInTheDocument();
+
+      vi.restoreAllMocks();
+    });
+
+    it('shows an honest unknown distance label when distance cannot be calculated', async () => {
+      const mockGeo = mockGeolocation({ latitude: 50.6292, longitude: 3.0573 });
+      vi.stubGlobal('navigator', { ...navigator, geolocation: mockGeo });
+
+      const noCoordinates: Restaurant[] = restaurantFixtures.slice(0, 1).map((r) => ({
+        ...r,
+        latitude: '',
+        longitude: '',
+        distanceMeters: undefined,
+      }));
+
+      server.use(
+        http.get(`${BASE}/restaurants/nearby`, () =>
+          HttpResponse.json(paginate(noCoordinates))),
+      );
+
+      render(<DiscoverPage />, { wrapper: createWrapper() });
+      await clickGeolocate();
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Lille Kebab Express' })).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Distance inconnue')).toBeInTheDocument();
 
       vi.restoreAllMocks();
     });
@@ -345,8 +495,8 @@ describe('DiscoverPage', () => {
       await clickGeolocate();
 
       await waitFor(() => {
-        expect(screen.getByText('Lille Kebab Express')).toBeInTheDocument();
-        expect(screen.getByText('Le Petit Bistrot Lillois')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Lille Kebab Express' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Le Petit Bistrot Lillois' })).toBeInTheDocument();
       });
 
       const loadMoreButton = screen.getByText(/afficher plus/i);
@@ -358,8 +508,11 @@ describe('DiscoverPage', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('La Table de Lille')).toBeInTheDocument();
-        expect(screen.getByText('Au Vieux Lille Gastronomique')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'La Table de Lille' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Au Vieux Lille Gastronomique' })).toBeInTheDocument();
+        // Page 1 restaurants should still be visible (accumulation)
+        expect(screen.getByRole('heading', { name: 'Lille Kebab Express' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Le Petit Bistrot Lillois' })).toBeInTheDocument();
       });
 
       vi.restoreAllMocks();

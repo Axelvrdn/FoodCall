@@ -120,11 +120,31 @@ describe('domain services', () => {
 
   describe('restaurants', () => {
     it('searches restaurants', async () => {
+      let seenQuery = '';
       server.use(
-        http.get(`${BASE}/restaurants/search`, () => HttpResponse.json(cursorPage([{ id: 'r1', name: 'Le Petit Bistro', description: '', address: '1 Rue Paris', latitude: '48.856600', longitude: '2.352200', cuisineTags: ['French'], photoUrls: [], phone: '', website: '', createdBy: 'u1', createdAt: '2024-01-01T00:00:00.000Z' }]))),
+        http.get(`${BASE}/restaurants/search`, ({ request }) => {
+          seenQuery = new URL(request.url).searchParams.get('q') ?? '';
+          return HttpResponse.json(cursorPage([{ id: 'r1', name: 'Le Petit Bistro', description: '', address: '1 Rue Paris', latitude: '48.856600', longitude: '2.352200', cuisineTags: ['French'], photoUrls: [], phone: '', website: '', createdBy: 'u1', createdAt: '2024-01-01T00:00:00.000Z' }]));
+        }),
       );
       const result = await restaurantsService.search('bistro');
       expect(result.data).toHaveLength(1);
+      expect(seenQuery).toBe('bistro');
+    });
+
+    it('filters and recalculates nearby restaurants through the default MSW handler', async () => {
+      const result = await restaurantsService.nearby(50.6292, 3.0573, 300, 20);
+
+      expect(result.data.map((restaurant) => restaurant.id)).toEqual(['rest-marcel', 'rest-bistrot']);
+      expect(result.data.map((restaurant) => restaurant.distanceMeters)).toEqual([102, 210]);
+    });
+
+    it('filters restaurant search through the default MSW handler', async () => {
+      const kebab = await restaurantsService.search('kebab');
+      const bistrot = await restaurantsService.search('bistrot');
+
+      expect(kebab.data.map((restaurant) => restaurant.id)).toEqual(['rest-kebab']);
+      expect(bistrot.data.map((restaurant) => restaurant.id)).toEqual(['rest-bistrot']);
     });
 
     it('handles 400 on invalid nearby params', async () => {

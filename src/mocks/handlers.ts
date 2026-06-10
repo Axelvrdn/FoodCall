@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { env } from '@/lib';
+import { calculateDistanceMeters, getRestaurantCoordinates, env } from '@/lib';
 import {
   apiErrors,
   callFixtures,
@@ -10,7 +10,6 @@ import {
   feedbackFixtures,
   geocodeFixture,
   groupFixtures,
-  groupListFixtures,
   importResponseFixture,
   inviteFixtures,
   memberFixtures,
@@ -24,19 +23,23 @@ import {
   voteFixtures,
   voteResultFixtures,
 } from './fixtures';
-import type { FoodCall, Group, GroupCreateRequest, GroupListItem, GroupMember, GroupUpdateRequest, Restaurant, RestaurantReview, RestaurantUpdateRequest, SessionCandidate, Vote, VoteSession } from '@/types/api';
+import type { FoodCall, Group, GroupCreateRequest, GroupInvite, GroupListItem, GroupMember, GroupUpdateRequest, Restaurant, RestaurantReview, RestaurantUpdateRequest, SessionCandidate, User, Vote, VoteSession } from '@/types/api';
 
 const api = (path: string) => `${env.apiUrl}${path}`;
 
 let mockVotes: Vote[] = [...voteFixtures];
 let mockGroups: Group[] = [...groupFixtures];
 let mockGroupMembers: GroupMember[] = [...memberFixtures];
+let mockGroupInvites: GroupInvite[] = [...inviteFixtures];
 let mockRestaurants: Restaurant[] = [...restaurantFixtures];
+let mockCurrentUser: User = { ...defaultUser };
 let nextVoteIndex = 1;
 const mockVotesStorageKey = 'foodcall.msw.votes';
 const mockGroupsStorageKey = 'foodcall.msw.groups';
 const mockGroupMembersStorageKey = 'foodcall.msw.group-members';
+const mockGroupInvitesStorageKey = 'foodcall.msw.group-invites';
 const mockRestaurantsStorageKey = 'foodcall.msw.restaurants';
+const mockCurrentUserStorageKey = 'foodcall.msw.current-user';
 
 function getBrowserStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null {
   if (typeof window === 'undefined') return null;
@@ -126,6 +129,29 @@ function writeMockGroupMembers(members: GroupMember[]) {
   getBrowserStorage()?.setItem(mockGroupMembersStorageKey, JSON.stringify(members));
 }
 
+function readMockGroupInvites(): GroupInvite[] {
+  const storage = getBrowserStorage();
+  if (!storage) return mockGroupInvites;
+  const rawInvites = storage.getItem(mockGroupInvitesStorageKey);
+  if (!rawInvites) {
+    storage.setItem(mockGroupInvitesStorageKey, JSON.stringify(mockGroupInvites));
+    return mockGroupInvites;
+  }
+  try {
+    const parsedInvites = JSON.parse(rawInvites) as GroupInvite[];
+    mockGroupInvites = parsedInvites;
+    return parsedInvites;
+  } catch {
+    storage.setItem(mockGroupInvitesStorageKey, JSON.stringify(mockGroupInvites));
+    return mockGroupInvites;
+  }
+}
+
+function writeMockGroupInvites(invites: GroupInvite[]) {
+  mockGroupInvites = invites;
+  getBrowserStorage()?.setItem(mockGroupInvitesStorageKey, JSON.stringify(invites));
+}
+
 function readMockRestaurants(): Restaurant[] {
   const storage = getBrowserStorage();
   if (!storage) return mockRestaurants;
@@ -149,23 +175,88 @@ function writeMockRestaurants(restaurants: Restaurant[]) {
   getBrowserStorage()?.setItem(mockRestaurantsStorageKey, JSON.stringify(restaurants));
 }
 
+function readMockCurrentUser(): User {
+  const storage = getBrowserStorage();
+  if (!storage) return mockCurrentUser;
+  const rawUser = storage.getItem(mockCurrentUserStorageKey);
+  if (!rawUser) {
+    storage.setItem(mockCurrentUserStorageKey, JSON.stringify(mockCurrentUser));
+    return mockCurrentUser;
+  }
+  try {
+    const parsedUser = JSON.parse(rawUser) as User;
+    mockCurrentUser = parsedUser;
+    return parsedUser;
+  } catch {
+    storage.setItem(mockCurrentUserStorageKey, JSON.stringify(mockCurrentUser));
+    return mockCurrentUser;
+  }
+}
+
+function writeMockCurrentUser(user: User) {
+  mockCurrentUser = user;
+  getBrowserStorage()?.setItem(mockCurrentUserStorageKey, JSON.stringify(user));
+}
+
+function textMatchesRestaurant(restaurant: Restaurant, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  return (
+    restaurant.name.toLowerCase().includes(normalizedQuery) ||
+    restaurant.address.toLowerCase().includes(normalizedQuery) ||
+    restaurant.cuisineTags.some((tag) => tag.toLowerCase().includes(normalizedQuery))
+  );
+}
+
+function withDistanceFromOrigin(restaurant: Restaurant, origin: { lat: number; lng: number }): Restaurant | null {
+  const coordinates = getRestaurantCoordinates(restaurant);
+  if (!coordinates) return null;
+
+  return {
+    ...restaurant,
+    distanceMeters: calculateDistanceMeters(origin, coordinates),
+  };
+}
+
+function withoutDistance(restaurant: Restaurant): Restaurant {
+  const { distanceMeters, ...rest } = restaurant;
+  void distanceMeters;
+  return rest;
+}
+
 export function resetMockState() {
   mockVotes = [...voteFixtures];
   mockGroups = [...groupFixtures];
   mockGroupMembers = [...memberFixtures];
+  mockGroupInvites = [...inviteFixtures];
   mockRestaurants = [...restaurantFixtures];
+  mockCurrentUser = { ...defaultUser };
   nextVoteIndex = 1;
   const storage = getBrowserStorage();
   storage?.removeItem(mockVotesStorageKey);
   storage?.removeItem(mockGroupsStorageKey);
   storage?.removeItem(mockGroupMembersStorageKey);
+  storage?.removeItem(mockGroupInvitesStorageKey);
   storage?.removeItem(mockRestaurantsStorageKey);
+  storage?.removeItem(mockCurrentUserStorageKey);
 }
 
 type Scenario = 'empty' | 'validation' | 'auth' | 'permission' | 'conflict' | 'rate-limit' | 'provider-failure' | 'provider-failure-502' | 'provider-failure-504' | 'not-found';
 
 function getScenario(url: URL): Scenario | null {
   return (url.searchParams.get('scenario') || null) as Scenario | null;
+}
+
+function groupToListItem(group: Group, role: GroupMember['role']): GroupListItem {
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    role,
+    budgetMax: group.budgetMax,
+    createdAt: group.createdAt,
+  };
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────
@@ -215,14 +306,16 @@ const userHandlers = [
   http.get(api('/users/me'), ({ request }) => {
     const scenario = getScenario(new URL(request.url));
     if (scenario === 'auth') return HttpResponse.json(apiErrors.unauthorized(), { status: 401 });
-    return HttpResponse.json(defaultUser);
+    return HttpResponse.json(readMockCurrentUser());
   }),
 
   http.patch(api('/users/me'), async ({ request }) => {
     const scenario = getScenario(new URL(request.url));
     if (scenario === 'auth') return HttpResponse.json(apiErrors.unauthorized(), { status: 401 });
     const body = await request.json() as Record<string, unknown>;
-    return HttpResponse.json({ ...defaultUser, ...body });
+    const updatedUser = { ...readMockCurrentUser(), ...body, updatedAt: new Date().toISOString() };
+    writeMockCurrentUser(updatedUser);
+    return HttpResponse.json(updatedUser);
   }),
 
   http.post(api('/users/me/avatar'), async ({ request }) => {
@@ -234,11 +327,15 @@ const userHandlers = [
     if (!body.contentType || !allowedTypes.includes(body.contentType)) {
       return HttpResponse.json(apiErrors.validation({ contentType: 'Formats acceptés : JPEG, PNG ou WebP.' }), { status: 400 });
     }
-    return HttpResponse.json({ ...defaultUser, avatarUrl: 'https://example.com/avatars/new.png' }, { status: 201 });
+    const updatedUser = { ...readMockCurrentUser(), avatarUrl: 'https://example.com/avatars/new.png', updatedAt: new Date().toISOString() };
+    writeMockCurrentUser(updatedUser);
+    return HttpResponse.json(updatedUser, { status: 201 });
   }),
 
   http.delete(api('/users/me/avatar'), () => {
-    return HttpResponse.json({ ...defaultUser, avatarUrl: null });
+    const updatedUser = { ...readMockCurrentUser(), avatarUrl: null, updatedAt: new Date().toISOString() };
+    writeMockCurrentUser(updatedUser);
+    return HttpResponse.json(updatedUser);
   }),
 ];
 
@@ -251,7 +348,16 @@ const groupHandlers = [
     if (scenario === 'empty') return HttpResponse.json(emptyPage<GroupListItem>());
     const cursor = url.searchParams.get('cursor') ?? undefined;
     const limit = parseInt(url.searchParams.get('limit') ?? '20', 10);
-    return HttpResponse.json(paginate(groupListFixtures, cursor, limit));
+    const currentUser = readMockCurrentUser();
+    const groups = readMockGroups();
+    const memberships = readMockGroupMembers().filter(member => member.userId === currentUser.id);
+    const visibleGroups = memberships
+      .map((membership) => {
+        const group = groups.find(item => item.id === membership.groupId && !item.deletedAt);
+        return group ? groupToListItem(group, membership.role) : null;
+      })
+      .filter((group): group is GroupListItem => group != null);
+    return HttpResponse.json(paginate(visibleGroups, cursor, limit));
   }),
 
   http.get(api('/groups/:id'), ({ params }) => {
@@ -274,6 +380,15 @@ const groupHandlers = [
       defaultSearchRadiusMeters: body.defaultSearchRadiusMeters ?? null,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), deletedAt: null,
     };
+    writeMockGroups([...readMockGroups(), newGroup]);
+    writeMockGroupMembers([...readMockGroupMembers(), {
+      id: `mem-${newGroup.id}-${defaultUser.id}`,
+      groupId: newGroup.id,
+      userId: defaultUser.id,
+      role: 'owner',
+      joinedAt: newGroup.createdAt,
+      user: defaultUser,
+    }]);
     return HttpResponse.json(newGroup, { status: 201 });
   }),
 
@@ -325,14 +440,26 @@ const groupHandlers = [
   }),
 
   // Invites
-  http.post(api('/groups/:id/invites'), ({ request }) => {
+  http.post(api('/groups/:id/invites'), ({ params, request }) => {
     const scenario = getScenario(new URL(request.url));
     if (scenario === 'auth') return HttpResponse.json(apiErrors.unauthorized(), { status: 401 });
     if (scenario === 'permission') return HttpResponse.json(apiErrors.forbidden('Only owner or admin can create invites'), { status: 403 });
     if (scenario === 'validation') return HttpResponse.json(apiErrors.validation({ maxUses: 'Must be positive' }), { status: 400 });
     if (scenario === 'not-found') return HttpResponse.json(apiErrors.notFound('Group'), { status: 404 });
     if (scenario === 'conflict') return HttpResponse.json(apiErrors.conflict('Invite limit reached'), { status: 409 });
-    return HttpResponse.json(inviteFixtures[0], { status: 201 });
+    const group = readMockGroups().find(item => item.id === params['id']);
+    if (!group) return HttpResponse.json(apiErrors.notFound('Group'), { status: 404 });
+    const invite: GroupInvite = {
+      id: `invite-${group.id}-${Date.now()}`,
+      groupId: group.id,
+      code: `${group.id.replace(/[^A-Z0-9]/gi, '').toUpperCase()}1`.slice(0, 8).padEnd(8, '1'),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      maxUses: null,
+      currentUses: 0,
+      createdAt: new Date().toISOString(),
+    };
+    writeMockGroupInvites([...readMockGroupInvites(), invite]);
+    return HttpResponse.json(invite, { status: 201 });
   }),
 
   http.post(api('/groups/join'), async ({ request }) => {
@@ -342,9 +469,27 @@ const groupHandlers = [
     if (scenario === 'conflict') return HttpResponse.json(apiErrors.conflict('Already a member'), { status: 409 });
     if (scenario === 'validation') return HttpResponse.json(apiErrors.validation({ code: 'Invalid invite code' }), { status: 400 });
     const body = await request.json() as { code: string };
-    const invite = inviteFixtures.find(i => i.code === body.code);
+    if (!/^[A-Z0-9]{8}$/.test(body.code)) {
+      return HttpResponse.json(apiErrors.validation({ code: 'Code must be 8 alphanumeric characters' }), { status: 400 });
+    }
+    const invites = readMockGroupInvites();
+    const invite = invites.find(i => i.code === body.code);
     if (!invite) return HttpResponse.json(apiErrors.notFound('Invite'), { status: 404 });
-    return HttpResponse.json(groupFixtures.find(g => g.id === invite.groupId)!);
+    const members = readMockGroupMembers();
+    const currentUser = readMockCurrentUser();
+    const existingMember = members.find(member => member.groupId === invite.groupId && member.userId === currentUser.id);
+    if (existingMember) return HttpResponse.json(apiErrors.conflict('Already a member'), { status: 409 });
+    const createdMember: GroupMember = {
+      id: `mem-${invite.groupId}-${currentUser.id}`,
+      groupId: invite.groupId,
+      userId: currentUser.id,
+      role: 'member',
+      joinedAt: new Date().toISOString(),
+      user: currentUser,
+    };
+    writeMockGroupMembers([...members, createdMember]);
+    writeMockGroupInvites(invites.map(item => item.id === invite.id ? { ...item, currentUses: item.currentUses + 1 } : item));
+    return HttpResponse.json(createdMember, { status: 201 });
   }),
 ];
 
@@ -370,7 +515,18 @@ const restaurantHandlers = [
     if (scenario === 'provider-failure-504') return HttpResponse.json(apiErrors.providerFailure504('google'), { status: 504 });
     const cursor = url.searchParams.get('cursor') ?? undefined;
     const limit = parseInt(url.searchParams.get('limit') ?? '20', 10);
-    return HttpResponse.json(paginate(readMockRestaurants(), cursor, limit));
+    const lat = Number.parseFloat(url.searchParams.get('lat') ?? '');
+    const lng = Number.parseFloat(url.searchParams.get('lng') ?? '');
+    const radius = Number.parseFloat(url.searchParams.get('radius') ?? '5000');
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return HttpResponse.json(apiErrors.validation({ lat: 'Required', lng: 'Required' }), { status: 400 });
+    }
+    const restaurants = readMockRestaurants()
+      .map((restaurant) => withDistanceFromOrigin(restaurant, { lat, lng }))
+      .filter((restaurant): restaurant is Restaurant => restaurant !== null)
+      .filter((restaurant) => restaurant.distanceMeters !== undefined && restaurant.distanceMeters <= radius)
+      .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
+    return HttpResponse.json(paginate(restaurants, cursor, limit));
   }),
 
   http.get(api('/restaurants/search'), ({ request }) => {
@@ -379,7 +535,11 @@ const restaurantHandlers = [
     if (scenario === 'empty') return HttpResponse.json(emptyPage<Restaurant>());
     const cursor = url.searchParams.get('cursor') ?? undefined;
     const limit = parseInt(url.searchParams.get('limit') ?? '20', 10);
-    return HttpResponse.json(paginate(readMockRestaurants(), cursor, limit));
+    const q = url.searchParams.get('q') ?? '';
+    const restaurants = readMockRestaurants()
+      .filter((restaurant) => textMatchesRestaurant(restaurant, q))
+      .map(withoutDistance);
+    return HttpResponse.json(paginate(restaurants, cursor, limit));
   }),
 
   http.get(api('/restaurants/:id'), ({ params }) => {
@@ -562,6 +722,7 @@ const sessionHandlers = [
       sessionId,
       candidateId: body.candidateId,
       userId: defaultUser.id,
+      value: 1,
       createdAt,
     };
     writeMockVotes([
@@ -671,8 +832,13 @@ const recommendationHandlers = [
 // ── Geo ──────────────────────────────────────────────────────────────────
 const geoHandlers = [
   http.get(api('/geo/geocode'), ({ request }) => {
-    const scenario = getScenario(new URL(request.url));
+    const url = new URL(request.url);
+    const scenario = getScenario(url);
     if (scenario === 'validation') return HttpResponse.json(apiErrors.validation({ q: 'Query required' }), { status: 400 });
+    const q = (url.searchParams.get('q') ?? '').toLowerCase();
+    if (q.includes('lille') || q.includes('kebab') || q.includes('bistrot')) {
+      return HttpResponse.json([{ lat: 50.6292, lng: 3.0573, formattedAddress: 'Place du Général de Gaulle, Lille' }]);
+    }
     return HttpResponse.json([geocodeFixture]);
   }),
 
