@@ -11,3 +11,8 @@ coverage
 .sisyphus/
 opencode.jsonc
 prototype/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
