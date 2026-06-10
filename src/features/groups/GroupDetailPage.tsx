@@ -41,6 +41,20 @@ type MemberRowProps = {
   removePending: boolean;
 };
 
+function getMemberDisplayName(member: GroupMember) {
+  const displayName = member.user?.displayName?.trim();
+  if (displayName) return displayName;
+
+  const email = member.user?.email?.trim();
+  if (email) return email.split('@')[0] || email;
+
+  return member.userId;
+}
+
+function getMemberInitial(displayName: string) {
+  return displayName.trim().charAt(0).toUpperCase() || '?';
+}
+
 function MemberRow({
   member,
   canManageMembers,
@@ -52,7 +66,8 @@ function MemberRow({
 }: MemberRowProps) {
   const [selectedRole, setSelectedRole] = useState<GroupRole>(member.role);
   const [confirmRemoval, setConfirmRemoval] = useState(false);
-  const displayName = member.user?.displayName ?? 'Utilisateur';
+  const displayName = getMemberDisplayName(member);
+  const contactLabel = member.user?.email?.trim() || member.userId;
   const canEditMember = canManageMembers && !isCurrentUser && member.role !== 'owner';
 
   return (
@@ -63,11 +78,11 @@ function MemberRow({
     >
       <div className="flex min-w-0 items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-white">
-          {member.user?.displayName?.[0] ?? '?'}
+          {getMemberInitial(displayName)}
         </div>
         <div className="min-w-0">
           <p className="break-words font-semibold text-fg">{displayName}</p>
-          <p className="break-all text-xs text-muted">{member.user?.email ?? ''}</p>
+          <p className="break-all text-xs text-muted">{contactLabel}</p>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -96,15 +111,26 @@ function MemberRow({
               Mettre à jour
             </button>
             {confirmRemoval ? (
-              <button
-                type="button"
-                onClick={() => onRemove(member.userId)}
-                disabled={removePending}
-                aria-label={`Confirmer le retrait de ${displayName}`}
-                className="rounded-radius bg-danger px-3 py-2 text-sm font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50"
-              >
-                Confirmer le retrait
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => onRemove(member.userId)}
+                  disabled={removePending}
+                  aria-label={`Confirmer le retrait de ${displayName}`}
+                  className="rounded-radius bg-danger px-3 py-2 text-sm font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50"
+                >
+                  Confirmer le retrait
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemoval(false)}
+                  disabled={removePending}
+                  aria-label={`Annuler le retrait de ${displayName}`}
+                  className="rounded-radius border border-border bg-surface px-3 py-2 text-sm font-semibold text-muted transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -303,14 +329,14 @@ export function GroupDetailPage() {
                     rolePending={updateMemberRole.isPending}
                     removePending={removeMember.isPending}
                     onRoleChange={(userId, role) => {
-                      const displayName = member.user?.displayName ?? 'Ce membre';
+                      const displayName = getMemberDisplayName(member);
                       setMemberStatus(null);
                       updateMemberRole.mutate({ userId, role }, {
                         onSuccess: () => setMemberStatus(`Rôle de ${displayName} mis à jour.`),
                       });
                     }}
                     onRemove={(userId) => {
-                      const displayName = member.user?.displayName ?? 'Ce membre';
+                      const displayName = getMemberDisplayName(member);
                       setMemberStatus(null);
                       removeMember.mutate(userId, {
                         onSuccess: () => setMemberStatus(`${displayName} retiré du groupe.`),
@@ -356,7 +382,7 @@ export function GroupDetailPage() {
             <h2 className="text-lg font-bold text-fg">Recommandations</h2>
             <div className="rounded-card bg-surface p-5 shadow-soft">
               <p className="text-sm text-muted mb-3">
-                Decouvrez les restaurants recommandes a proximite en fonction de la qualite, distance, budget et historique du groupe.
+                Découvrez les restaurants recommandés à proximité en fonction de la qualité, distance, budget et historique du groupe.
               </p>
               <Link
                 to={`/groupes/${group.id}/recommendations`}

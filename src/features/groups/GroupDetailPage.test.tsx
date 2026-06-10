@@ -290,6 +290,43 @@ describe('GroupDetailPage', () => {
     expect(screen.queryByText('ben@example.com')).not.toBeInTheDocument();
   });
 
+  it('renders readable member fallbacks and lets removal confirmation be cancelled', async () => {
+    const user = userEvent.setup();
+    const memberWithoutName = {
+      ...memberFixtures[2],
+      user: {
+        ...userFixtures[2],
+        displayName: '',
+        email: 'chloe.backup@example.com',
+      },
+    };
+
+    server.use(
+      http.get(`${BASE}/groups/:id`, ({ params }) => {
+        const g = groupFixtures.find((gf) => gf.id === params['id']);
+        return g ? HttpResponse.json(g) : HttpResponse.json(apiErrors.notFound('Group'), { status: 404 });
+      }),
+      http.get(`${BASE}/groups/:id/members`, ({ params }) => {
+        return HttpResponse.json(memberFixtures
+          .filter((m) => m.groupId === params['id'])
+          .map((m) => (m.id === memberWithoutName.id ? memberWithoutName : m)));
+      }),
+      http.get(`${BASE}/groups/:groupId/sessions`, () => HttpResponse.json(emptyPage<VoteSession>())),
+    );
+
+    setCurrentUser(userFixtures[0]);
+    render(createElement(GroupDetailPage), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(screen.getByText('chloe.backup')).toBeInTheDocument());
+    expect(screen.getByLabelText('Rôle de chloe.backup')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retirer chloe.backup' }));
+    expect(screen.getByRole('button', { name: 'Confirmer le retrait de chloe.backup' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Annuler le retrait de chloe.backup' }));
+    expect(screen.queryByRole('button', { name: 'Confirmer le retrait de chloe.backup' })).not.toBeInTheDocument();
+  });
+
   it('does not expose member management controls to admins', async () => {
     server.use(
       http.get(`${BASE}/groups/:id`, ({ params }) => {

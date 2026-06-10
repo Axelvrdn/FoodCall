@@ -27,6 +27,8 @@ function createRouteWrapper() {
         createElement(Routes, null,
           createElement(Route, { path: '/groupes', element: children }),
           createElement(Route, { path: '/groupes/:id', element: createElement('h1', null, 'Détail groupe ouvert') }),
+          createElement(Route, { path: '/groupes/:id/edit', element: createElement('h1', null, 'Gestion groupe ouverte') }),
+          createElement(Route, { path: '/groupes/:id/invitations', element: createElement('h1', null, 'Invitations groupe ouvertes') }),
         ),
       ),
     );
@@ -84,8 +86,30 @@ describe('GroupsPage', () => {
     );
     render(createElement(GroupsPage), { wrapper: createWrapper() });
     await waitFor(() => expect(screen.getByText('Aucun groupe pour le moment.')).toBeInTheDocument());
-    expect(screen.getByText('Créer un groupe')).toBeInTheDocument();
-    expect(screen.getByText('Rejoindre un groupe')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Créer un groupe' }).some((link) => link.getAttribute('href') === '/groupes/nouveau')).toBe(true);
+    expect(screen.getAllByRole('link', { name: 'Rejoindre un groupe' }).some((link) => link.getAttribute('href') === '/groupes/rejoindre')).toBe(true);
+  });
+
+  it('shows primary create and secondary join CTAs above the backend group list', async () => {
+    server.use(
+      http.get(`${BASE}/groups`, () =>
+        HttpResponse.json(cursorPage([ownerGroup, memberGroup])),
+      ),
+    );
+    render(createElement(GroupsPage), { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText('Lille Lunch Crew')).toBeInTheDocument());
+
+    expect(screen.getByRole('link', { name: 'Créer un groupe' })).toHaveAttribute('href', '/groupes/nouveau');
+    expect(screen.getByRole('link', { name: 'Rejoindre un groupe' })).toHaveAttribute('href', '/groupes/rejoindre');
+  });
+
+  it('links empty state join action to the backend invite-code flow', async () => {
+    server.use(
+      http.get(`${BASE}/groups`, () => HttpResponse.json(cursorPage<GroupListItem>([]))),
+    );
+    render(createElement(GroupsPage), { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText('Aucun groupe pour le moment.')).toBeInTheDocument());
+    expect(screen.getAllByRole('link', { name: 'Rejoindre un groupe' }).some((link) => link.getAttribute('href') === '/groupes/rejoindre')).toBe(true);
   });
 
   it('shows error state with role="alert"', async () => {
@@ -116,7 +140,7 @@ describe('GroupsPage', () => {
     expect(screen.getByText(/35,00\s*€/)).toBeInTheDocument();
   });
 
-  it('shows role-gated actions: owner and admin see Gérer and Inviter, member does not', async () => {
+  it('links role-gated actions to real management and invitation routes', async () => {
     server.use(
       http.get(`${BASE}/groups`, () =>
         HttpResponse.json(cursorPage([ownerGroup, adminGroup, memberGroup])),
@@ -124,8 +148,21 @@ describe('GroupsPage', () => {
     );
     render(createElement(GroupsPage), { wrapper: createWrapper() });
     await waitFor(() => expect(screen.getByText('Lille Lunch Crew')).toBeInTheDocument());
-    expect(screen.getAllByText('Gérer')).toHaveLength(2);
-    expect(screen.getAllByText('Inviter')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Gérer Lille Lunch Crew' })).toHaveAttribute('href', '/groupes/g1/edit');
+    expect(screen.getByRole('link', { name: 'Inviter Lille Lunch Crew' })).toHaveAttribute('href', '/groupes/g1/invitations');
+    expect(screen.getByRole('link', { name: 'Gérer Paris Dinner Club' })).toHaveAttribute('href', '/groupes/g2/edit');
+    expect(screen.getByRole('link', { name: 'Inviter Paris Dinner Club' })).toHaveAttribute('href', '/groupes/g2/invitations');
+  });
+
+  it('does not render inline default settings from the list management action', async () => {
+    server.use(
+      http.get(`${BASE}/groups`, () =>
+        HttpResponse.json(cursorPage([ownerGroup])),
+      ),
+    );
+    render(createElement(GroupsPage), { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText('Lille Lunch Crew')).toBeInTheDocument());
+    expect(screen.queryByText('Paramètres par défaut')).not.toBeInTheDocument();
   });
 
   it('opens a group detail route from the group list', async () => {
@@ -154,6 +191,26 @@ describe('GroupsPage', () => {
     await waitFor(() => expect(screen.getByText('Lyon Weekend Bites')).toBeInTheDocument());
     expect(screen.queryByText('Gérer')).not.toBeInTheDocument();
     expect(screen.queryByText('Inviter')).not.toBeInTheDocument();
+  });
+
+  it('lets member role groups be opened', async () => {
+    server.use(
+      http.get(`${BASE}/groups`, () =>
+        HttpResponse.json(cursorPage([memberGroup])),
+      ),
+    );
+    render(createElement(GroupsPage), { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText('Lyon Weekend Bites')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Ouvrir Lyon Weekend Bites' })).toBeInTheDocument();
+  });
+
+  it('links empty state Créer un groupe to the creation route', async () => {
+    server.use(
+      http.get(`${BASE}/groups`, () => HttpResponse.json(cursorPage<GroupListItem>([]))),
+    );
+    render(createElement(GroupsPage), { wrapper: createWrapper() });
+    await waitFor(() => expect(screen.getByText('Aucun groupe pour le moment.')).toBeInTheDocument());
+    expect(screen.getAllByRole('link', { name: 'Créer un groupe' }).some((link) => link.getAttribute('href') === '/groupes/nouveau')).toBe(true);
   });
 
   it('shows Afficher plus button when nextCursor is present', async () => {

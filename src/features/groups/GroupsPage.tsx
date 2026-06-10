@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useInfiniteGroupsQuery, useGroupQuery } from '@/features/server-state';
+import { useInfiniteGroupsQuery } from '@/features/server-state';
 import { canManageGroup, canCreateInvite } from './group-queries';
 import { Hero } from '@/components/ui';
-import { formatBudget, formatDistance } from '@/lib/formatters';
-import type { GroupListItem, Group } from '@/types/api';
+import { ROUTES } from '@/lib';
+import { formatBudget } from '@/lib/formatters';
+import type { GroupListItem } from '@/types/api';
 
 function RoleBadge({ role }: { role: GroupListItem['role'] }) {
   const label = role === 'owner' ? 'Propriétaire' : role === 'admin' ? 'Admin' : 'Membre';
@@ -12,9 +12,13 @@ function RoleBadge({ role }: { role: GroupListItem['role'] }) {
   return <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${tone}`}>{label}</span>;
 }
 
-function GroupCard({ group, onSelect }: { group: GroupListItem; onSelect: (id: string) => void }) {
+function groupRoute(template: string, groupId: string) {
+  return template.replace(':id', groupId).replace(':groupId', groupId);
+}
+
+function GroupCard({ group }: { group: GroupListItem }) {
   return (
-    <article className="rounded-card bg-surface p-5 shadow-soft">
+    <article className="grid gap-4 rounded-card bg-surface p-5 shadow-soft">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-lg font-bold text-fg">{group.name}</h3>
@@ -23,62 +27,41 @@ function GroupCard({ group, onSelect }: { group: GroupListItem; onSelect: (id: s
         <RoleBadge role={group.role} />
       </div>
       {group.budgetMax && (
-        <p className="mt-3 text-sm text-muted">
+        <p className="text-sm text-muted">
           Budget : <span className="font-mono font-semibold text-fg">{formatBudget(group.budgetMax)}</span>
         </p>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
+      <p className="text-xs text-muted">
+        Les paramètres de départ, membres et sessions sont chargés depuis le détail backend du groupe.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          to={groupRoute(ROUTES.groupDetail, group.id)}
+          aria-label={`Ouvrir ${group.name}`}
+          className="rounded-radius bg-primary px-4 py-2 text-sm font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97]"
+        >
+          Ouvrir
+        </Link>
         {canManageGroup(group.role) && (
-          <>
-            <Link
-              to={`/groupes/${group.id}`}
-              aria-label={`Ouvrir ${group.name}`}
-              className="rounded-radius bg-primary px-4 py-2 text-sm font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97]"
-            >
-              Ouvrir
-            </Link>
-            <button
-              type="button"
-              onClick={() => onSelect(group.id)}
-              className="rounded-radius bg-surface border border-border px-4 py-2 text-sm font-semibold text-fg transition-transform duration-150 ease-out active:scale-[0.97]"
-            >
-              Gérer
-            </button>
-          </>
+          <Link
+            to={groupRoute(ROUTES.groupEdit, group.id)}
+            aria-label={`Gérer ${group.name}`}
+            className="rounded-radius bg-surface border border-border px-4 py-2 text-sm font-semibold text-fg transition-transform duration-150 ease-out active:scale-[0.97]"
+          >
+            Gérer
+          </Link>
         )}
         {canCreateInvite(group.role) && (
-          <button
-            type="button"
+          <Link
+            to={groupRoute(ROUTES.groupInvites, group.id)}
+            aria-label={`Inviter ${group.name}`}
             className="rounded-radius bg-surface border border-border px-4 py-2 text-sm font-semibold text-fg transition-transform duration-150 ease-out active:scale-[0.97]"
           >
             Inviter
-          </button>
+          </Link>
         )}
       </div>
     </article>
-  );
-}
-
-function GroupDetail({ group }: { group: Group }) {
-  return (
-    <div className="mt-4 rounded-card bg-surface p-5 shadow-soft">
-      <h4 className="font-bold text-fg">Paramètres par défaut</h4>
-      {group.defaultStartAddress && (
-        <p className="mt-2 text-sm text-muted">
-          Départ : <span className="text-fg">{group.defaultStartAddress}</span>
-        </p>
-      )}
-      {group.defaultSearchRadiusMeters != null && (
-        <p className="mt-1 text-sm text-muted">
-          Rayon de recherche : <span className="text-fg">{formatDistance(group.defaultSearchRadiusMeters)}</span>
-        </p>
-      )}
-      {group.budgetMax && (
-        <p className="mt-1 text-sm text-muted">
-          Budget : <span className="font-mono font-semibold text-fg">{formatBudget(group.budgetMax)}</span>
-        </p>
-      )}
-    </div>
   );
 }
 
@@ -91,9 +74,6 @@ export function GroupsPage() {
     fetchNextPage,
     isFetchingNextPage,
   } = useInfiniteGroupsQuery(20);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { data: selectedGroup } = useGroupQuery(selectedId ?? '');
-
   const groups = groupsPages?.pages.flatMap((page) => page.data) ?? [];
 
   return (
@@ -101,9 +81,24 @@ export function GroupsPage() {
       <Hero
         title="Tes groupes décident mieux"
         subtitle="Groupes, votes en cours et historique de calls, sans adresse de départ dans le profil."
+        actions={
+          <>
+            <Link
+              to={ROUTES.groupCreate}
+              className="rounded-full bg-white px-5 py-3 font-bold text-primary transition-transform duration-150 ease-out active:scale-[0.97]"
+            >
+              Créer un groupe
+            </Link>
+            <Link
+              to={ROUTES.groupJoin}
+              className="rounded-full border border-white/70 px-5 py-3 font-bold text-white transition-transform duration-150 ease-out active:scale-[0.97]"
+            >
+              Rejoindre un groupe
+            </Link>
+          </>
+        }
       />
-      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <div className="grid gap-4">
+      <section className="grid gap-4">
           {isLoading && <p role="status" className="text-sm text-muted">Chargement…</p>}
           {error && (
             <div role="alert" className="rounded bg-danger/10 p-3 text-sm text-danger">
@@ -114,24 +109,28 @@ export function GroupsPage() {
             <div className="rounded-card bg-surface p-5 shadow-soft text-center">
               <p className="text-muted">Aucun groupe pour le moment.</p>
               <div className="mt-4 flex justify-center gap-3">
-                <button
-                  type="button"
+                <Link
+                  to={ROUTES.groupCreate}
                   className="rounded-radius bg-primary px-4 py-2 text-sm font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97]"
                 >
                   Créer un groupe
-                </button>
-                <button
-                  type="button"
+                </Link>
+                <Link
+                  to={ROUTES.groupJoin}
                   className="rounded-radius bg-surface border border-border px-4 py-2 text-sm font-semibold text-fg transition-transform duration-150 ease-out active:scale-[0.97]"
                 >
                   Rejoindre un groupe
-                </button>
+                </Link>
               </div>
             </div>
           )}
-          {!isLoading && !error && groups.map((group) => (
-            <GroupCard key={group.id} group={group} onSelect={setSelectedId} />
-          ))}
+          {!isLoading && !error && groups.length > 0 && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {groups.map((group) => (
+                <GroupCard key={group.id} group={group} />
+              ))}
+            </div>
+          )}
           {!isLoading && !error && hasNextPage && (
             <button
               type="button"
@@ -142,10 +141,6 @@ export function GroupsPage() {
               {isFetchingNextPage ? 'Chargement...' : 'Afficher plus'}
             </button>
           )}
-        </div>
-        <aside>
-          {selectedGroup && <GroupDetail group={selectedGroup} />}
-        </aside>
       </section>
     </div>
   );

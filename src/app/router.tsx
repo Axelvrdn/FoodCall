@@ -4,7 +4,11 @@ import { CallsPage } from '@/features/calls/CallsPage';
 import { DiscoverPage } from '@/features/discover/DiscoverPage';
 import { RestaurantDetailPage } from '@/features/discover/RestaurantDetailPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
+import { GroupCreatePage } from '@/features/groups/GroupCreatePage';
 import { GroupDetailPage } from '@/features/groups/GroupDetailPage';
+import { GroupEditPage } from '@/features/groups/GroupEditPage';
+import { GroupInvitesPage } from '@/features/groups/GroupInvitesPage';
+import { GroupJoinPage } from '@/features/groups/GroupJoinPage';
 import { GroupsPage } from '@/features/groups/GroupsPage';
 import { SessionsPage } from '@/features/sessions/SessionsPage';
 import { SessionDetailPage } from '@/features/sessions/SessionDetailPage';
@@ -65,6 +69,10 @@ export const router = createBrowserRouter([
     { path: ROUTES.discover, element: <DiscoverPage /> },
     { path: `${ROUTES.restaurantDetail}`, element: <RestaurantDetailPage /> },
     { path: ROUTES.groups, element: <GroupsPage /> },
+    { path: ROUTES.groupCreate, element: <GroupCreatePage /> },
+    { path: ROUTES.groupJoin, element: <GroupJoinPage /> },
+    { path: ROUTES.groupEdit, element: <GroupEditPage /> },
+    { path: ROUTES.groupInvites, element: <GroupInvitesPage /> },
     { path: `${ROUTES.groups}/:groupId/recommendations`, element: <GroupRecommendationsPage /> },
     { path: `${ROUTES.groups}/:id`, element: <GroupDetailPage /> },
     { path: `${ROUTES.groups}/:groupId/sessions`, element: <SessionsPage /> },

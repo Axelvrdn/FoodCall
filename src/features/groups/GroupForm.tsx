@@ -7,7 +7,7 @@ interface GroupFormProps {
   mode: 'create' | 'edit';
   group?: Group;
   readOnly?: boolean;
-  onSuccess?: () => void;
+  onSuccess?: (group: Group) => void;
 }
 
 export function GroupForm({ mode, group, readOnly, onSuccess }: GroupFormProps) {
@@ -73,16 +73,16 @@ export function GroupForm({ mode, group, readOnly, onSuccess }: GroupFormProps) 
 
     if (mode === 'create') {
       createMutation.mutate(payload as GroupCreateRequest, {
-          onSuccess: () => {
-            setName('');
+          onSuccess: (createdGroup) => {
+          setName('');
           setDescription('');
           setBudgetMax('');
           setDefaultStartAddress('');
           setDefaultLatitude('');
-            setDefaultLongitude('');
-            setDefaultSearchRadiusMeters('');
-            setSubmitSuccess('Groupe créé.');
-            onSuccess?.();
+          setDefaultLongitude('');
+          setDefaultSearchRadiusMeters('');
+          setSubmitSuccess('Groupe créé.');
+          onSuccess?.(createdGroup);
           },
         onError: (err) => {
           setSubmitError(err.message ?? 'Erreur lors de la création du groupe.');
@@ -92,9 +92,9 @@ export function GroupForm({ mode, group, readOnly, onSuccess }: GroupFormProps) 
       updateMutation.mutate(
         { id: group.id, payload: payload as GroupUpdateRequest },
         {
-          onSuccess: () => {
+          onSuccess: (updatedGroup) => {
             setSubmitSuccess('Groupe mis à jour.');
-            onSuccess?.();
+            onSuccess?.(updatedGroup);
           },
           onError: (err) => {
             setSubmitError(err.message ?? 'Erreur lors de la mise à jour du groupe.');

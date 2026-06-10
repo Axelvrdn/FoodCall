@@ -12,4 +12,4 @@ export function validatePassword(password: string): { valid: boolean; errors: st
   return { valid: errors.length === 0, errors };
 }
 
-export function validateInviteCode(code: string): boolean { return /^[A-Z0-9-]{6,24}$/.test(code); }
+export function validateInviteCode(code: string): boolean { return /^[A-Z0-9]{8}$/.test(code); }
